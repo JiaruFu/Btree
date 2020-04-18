@@ -54,7 +54,7 @@ const int INTARRAYLEAFSIZE = (Page::SIZE - sizeof(PageId)) / (sizeof(int) + size
 const int INTARRAYNONLEAFSIZE = (Page::SIZE - sizeof(int) - sizeof(PageId)) / (sizeof(int) + sizeof(PageId));
 
 /**
- * @brief Structure to store a key-rid pair. It is used to pass the pair to functions that 
+ * @brief Structure to store a key-rid pair. It is used to pass the pair to functions that
  * add to or make changes to the leaf node pages of the tree. Is templated for the key member.
  */
 template <class T>
@@ -71,7 +71,7 @@ public:
 };
 
 /**
- * @brief Structure to store a key page pair which is used to pass the key and page to functions that make 
+ * @brief Structure to store a key page pair which is used to pass the key and page to functions that make
  * any modifications to the non leaf pages of the tree.
 */
 template <class T>
@@ -134,8 +134,8 @@ struct IndexMetaInfo
 
 /*
 Each node is a page, so once we read the page in we just cast the pointer to the page to this struct and use it to access the parts
-These structures basically are the format in which the information is stored in the pages for the index file depending on what kind of 
-node they are. The level memeber of each non leaf structure seen below is set to 1 if the nodes 
+These structures basically are the format in which the information is stored in the pages for the index file depending on what kind of
+node they are. The level memeber of each non leaf structure seen below is set to 1 if the nodes
 at this level are just above the leaf nodes. Otherwise set to 0.
 */
 
@@ -177,7 +177,7 @@ struct LeafNodeInt
 
   /**
    * Page number of the leaf on the right side.
-	 * This linking of leaves allows to easily move from one leaf to the next leaf during index scan.
+     * This linking of leaves allows to easily move from one leaf to the next leaf during index scan.
    */
   PageId rightSibPageNo;
 };
@@ -216,7 +216,7 @@ private:
   Datatype attributeType;
 
   /**
-   * Offset of attribute, over which index is built, inside records. 
+   * Offset of attribute, over which index is built, inside records.
    */
   int attrByteOffset;
 
@@ -295,82 +295,94 @@ private:
   /**
    * records the value the new page to be split on
    **/
-  int middleInt; 
+  int middleInt;
 
 public:
   /**
-   * BTreeIndex Constructor. 
-	 * Check to see if the corresponding index file exists. If so, open the file.
-	 * If not, create it and insert entries for every tuple in the base relation using FileScan class.
+   * BTreeIndex Constructor.
+     * Check to see if the corresponding index file exists. If so, open the file.
+     * If not, create it and insert entries for every tuple in the base relation using FileScan class.
    *
    * @param relationName        Name of file.
    * @param outIndexName        Return the name of index file.
-   * @param bufMgrIn						Buffer Manager Instance
-   * @param attrByteOffset			Offset of attribute, over which index is to be built, in the record
-   * @param attrType						Datatype of attribute over which index is built
+   * @param bufMgrIn                        Buffer Manager Instance
+   * @param attrByteOffset            Offset of attribute, over which index is to be built, in the record
+   * @param attrType                        Datatype of attribute over which index is built
    * @throws  BadIndexInfoException     If the index file already exists for the corresponding attribute, but values in metapage(relationName, attribute byte offset, attribute type etc.) do not match with values received through constructor parameters.
    */
   BTreeIndex(const std::string &relationName, std::string &outIndexName,
              BufMgr *bufMgrIn, const int attrByteOffset, const Datatype attrType);
 
   /**
-   * BTreeIndex Destructor. 
-	 * End any initialized scan, flush index file, after unpinning any pinned pages, from the buffer manager
-	 * and delete file instance thereby closing the index file.
-	 * Destructor should not throw any exceptions. All exceptions should be caught in here itself. 
-	 * */
+   * BTreeIndex Destructor.
+     * End any initialized scan, flush index file, after unpinning any pinned pages, from the buffer manager
+     * and delete file instance thereby closing the index file.
+     * Destructor should not throw any exceptions. All exceptions should be caught in here itself.
+     * */
   ~BTreeIndex();
 
   /**
-	 * Insert a new entry using the pair <value,rid>. 
-	 * Start from root to recursively find out the leaf to insert the entry in. The insertion may cause splitting of leaf node.
-	 * This splitting will require addition of new leaf page number entry into the parent non-leaf, which may in-turn get split.
-	 * This may continue all the way upto the root causing the root to get split. If root gets split, metapage needs to be changed accordingly.
-	 * Make sure to unpin pages as soon as you can.
-   * @param key			Key to insert, pointer to integer/double/char string
-   * @param rid			Record ID of a record whose entry is getting inserted into the index.
-	**/
+     * Insert a new entry using the pair <value,rid>.
+     * Start from root to recursively find out the leaf to insert the entry in. The insertion may cause splitting of leaf node.
+     * This splitting will require addition of new leaf page number entry into the parent non-leaf, which may in-turn get split.
+     * This may continue all the way upto the root causing the root to get split. If root gets split, metapage needs to be changed accordingly.
+     * Make sure to unpin pages as soon as you can.
+   * @param key            Key to insert, pointer to integer/double/char string
+   * @param rid            Record ID of a record whose entry is getting inserted into the index.
+    **/
   const void insertEntry(const void *key, const RecordId rid);
 
   /**
-	 * Begin a filtered scan of the index.  For instance, if the method is called 
-	 * using ("a",GT,"d",LTE) then we should seek all entries with a value 
-	 * greater than "a" and less than or equal to "d".
-	 * If another scan is already executing, that needs to be ended here.
-	 * Set up all the variables for scan. Start from root to find out the leaf page that contains the first RecordID
-	 * that satisfies the scan parameters. Keep that page pinned in the buffer pool.
-   * @param lowVal	Low value of range, pointer to integer / double / char string
-   * @param lowOp		Low operator (GT/GTE)
-   * @param highVal	High value of range, pointer to integer / double / char string
-   * @param highOp	High operator (LT/LTE)
-   * @throws  BadOpcodesException If lowOp and highOp do not contain one of their their expected values 
+     * Begin a filtered scan of the index.  For instance, if the method is called
+     * using ("a",GT,"d",LTE) then we should seek all entries with a value
+     * greater than "a" and less than or equal to "d".
+     * If another scan is already executing, that needs to be ended here.
+     * Set up all the variables for scan. Start from root to find out the leaf page that contains the first RecordID
+     * that satisfies the scan parameters. Keep that page pinned in the buffer pool.
+   * @param lowVal    Low value of range, pointer to integer / double / char string
+   * @param lowOp        Low operator (GT/GTE)
+   * @param highVal    High value of range, pointer to integer / double / char string
+   * @param highOp    High operator (LT/LTE)
+   * @throws  BadOpcodesException If lowOp and highOp do not contain one of their their expected values
    * @throws  BadScanrangeException If lowVal > highval
-	 * @throws  NoSuchKeyFoundException If there is no key in the B+ tree that satisfies the scan criteria.
-	**/
+     * @throws  NoSuchKeyFoundException If there is no key in the B+ tree that satisfies the scan criteria.
+    **/
   const void startScan(const void *lowVal, const Operator lowOp, const void *highVal, const Operator highOp);
-
+    
+    /**
+      * Start from root to find out the leaf page that contains the first RecordID
+      * @param nl    the current page
+      * @param level        the level of current non-leaf page
+      * @param lfn    the leaf node page with reference
+      * @param lowValParm    Low value of range, pointer to integer / double / char string
+      * @param low_page_key  the key of page
+      * @param isParent  Boolean value to check if it is the parents of leaf node
+        * @throws  NoSuchKeyFoundException If there is no key in the B+ tree that satisfies the scan criteria.
+       **/
+  const void startScanHeler(Page *nl, int lowValParm, int &index);
+    
   /**
-	 * Fetch the record id of the next index entry that matches the scan.
-	 * Return the next record from current page being scanned. If current page has been scanned to its entirety, move on to the right sibling of current page, if any exists, to start scanning that page. Make sure to unpin any pages that are no longer required.
-   * @param outRid	RecordId of next record found that satisfies the scan criteria returned in this
-	 * @throws ScanNotInitializedException If no scan has been initialized.
-	 * @throws IndexScanCompletedException If no more records, satisfying the scan criteria, are left to be scanned.
-	**/
+     * Fetch the record id of the next index entry that matches the scan.
+     * Return the next record from current page being scanned. If current page has been scanned to its entirety, move on to the right sibling of current page, if any exists, to start scanning that page. Make sure to unpin any pages that are no longer required.
+   * @param outRid    RecordId of next record found that satisfies the scan criteria returned in this
+     * @throws ScanNotInitializedException If no scan has been initialized.
+     * @throws IndexScanCompletedException If no more records, satisfying the scan criteria, are left to be scanned.
+    **/
   const void scanNext(RecordId &outRid); // returned record id
 
   /**
-	 * Terminate the current scan. Unpin any pinned pages. Reset scan specific variables.
-	 * @throws ScanNotInitializedException If no scan has been initialized.
-	**/
+     * Terminate the current scan. Unpin any pinned pages. Reset scan specific variables.
+     * @throws ScanNotInitializedException If no scan has been initialized.
+    **/
   const void endScan();
 
   /**
-   * Start from root to recursively find out the leaf to insert the entry in. 
+   * Start from root to recursively find out the leaf to insert the entry in.
    * The insertion may cause splitting of leaf node.
-   * If the node is full and splited, set splitted to true 
-   * and save the PageId of the newly created node into newPageId 
+   * If the node is full and splited, set splitted to true
+   * and save the PageId of the newly created node into newPageId
    * so that the page can be added to its parent page.
-   * 
+   *
    * @param page is the page to recurse on
    * @param level is the level of the page recursed on
    * @param isRook record whether ths current page is root
@@ -379,58 +391,58 @@ public:
    * @param splited records whether the node is splited
    * @param childLeaf records whether the child node is a leaf
    * @param newPageId records the child's page id if it is splited
-   * 
+   *
   **/
-  const void recurseInsert(Page *page, int level, bol isRoot, const void *keyPtr, const RecordId rid, bool &splited, bol &childLeaf, PageId &newPageId);
+  const void recurseInsert(Page *page, int level, bool isRoot, const void *keyPtr, const RecordId rid, bool &splited, bool &childLeaf, PageId *newPageId);
 
   /**
-	 * find the PageNo of the child to recurse
-	 *
-	 * @param page The page we are trying to find the child PageId on
-	 * @param keyPtr Pointer to the key we are trying to find
+     * find the PageNo of the child to recurse
+     *
+     * @param page The page we are trying to find the child PageId on
+     * @param keyPtr Pointer to the key we are trying to find
    * @param index to store the index we find
   **/
   const void findPageNo(Page *page, const void *keyPtr, int &index);
 
   /**
    * find the index of page for value at keyPtr
-   * 
-	 * @param page The page we are trying to find the child PageId on
-	 * @param keyPtr Pointer to the key we are trying to find
+   *
+     * @param page The page we are trying to find the child PageId on
+     * @param keyPtr Pointer to the key we are trying to find
    * @param index to store the index we find
   **/
   const void findKey(Page *leafPage, const void *keyPtr, int &index);
 
   /**
    * find the middle value based on key
-   * 
+   *
    * @param page to find the middle value
-	 * @param isLeaf 
-	 * @param keyPtr Pointer to the key
-	 * @param middleIndex to record the middle index we find
-   **/ 
+     * @param isLeaf
+     * @param keyPtr Pointer to the key
+     * @param middleIndex to record the middle index we find
+   **/
   const void findMiddle(Page* page, bool isLeaf, const void* keyPtr, int &middleIndex);
 
   /**
    * inset in to non leaf page
-   * 
+   *
    * @param page to insert on
    * @param keyPtr pointer to the key to insert
    * @param pageId for the insertion
-  **/ 
+  **/
   const void insertNonLeaf(Page* page, const void* keyPtr, PageId pageId);
 
   /**
-	 * split a page
+     * split a page
    * use the key to determine the middle key
-	 *
-	 *@param fullPage The page to split
-	 *@param isLeaf records whether the page is the leaf
-	 *@param keyPtr The key we are trying to insert
-	 *@param newPageIdChild from the child we are going to insert after spliting
-	 *@param newPageId the PageId of the new page created after spliting
-	**/
-	const void split(Page* fullPage, bool isLeaf, const void* keyPtr, PageId newPageIdChild, PageId &newPageId);
+     *
+     *@param fullPage The page to split
+     *@param isLeaf records whether the page is the leaf
+     *@param keyPtr The key we are trying to insert
+     *@param newPageIdChild from the child we are going to insert after spliting
+     *@param newPageId the PageId of the new page created after spliting
+    **/
+    const void split(Page* fullPage, bool isLeaf, const void* keyPtr, PageId newPageIdChild, PageId &newPageId);
 };
 
 } // namespace badgerdb
