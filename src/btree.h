@@ -393,7 +393,7 @@ public:
    * @param newPageId records the child's page id if it is splited
    *
   **/
-  const void recurseInsert(Page *page, int level, bool isRoot, const void *keyPtr, const RecordId rid, bool &splited, bool &childLeaf, PageId *newPageId);
+  const void recurseInsert(Page *page, int level, bool isRoot, const void *keyPtr, const RecordId rid, bool &splited, bool &childLeaf, PageId &newPageId);
 
   /**
      * find the PageNo of the child to recurse
