@@ -43,10 +43,12 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
     idxStr << relationName << '.' << attrByteOffset;
     std ::string indexName = idxStr.str(); // indexName is the name of the index file
 
+    blobfile->remove("relA.0");
+    
     if (blobfile->exists(indexName))
     {
         blobfile->open(indexName);
-
+        
         PageId first_page_id = blobfile->getFirstPageNo();
         Page *meta;
         bufMgr->readPage(file, first_page_id, meta);
@@ -73,17 +75,9 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
         //create a new meta page
         PageId new_page_number;
         Page *new_page;
-        bufMgr->allocPage(file, new_page_number, new_page);
+        bufMgr->allocPage(blobfile, new_page_number, new_page);
 
         IndexMetaInfo *inf = (IndexMetaInfo *)new_page;
-        // char rn[20];
-
-        // //set up the relation name for the new meta page
-        // int i;
-        // for (i = 0; i < sizeof(rn); i++) {
-        //       rn[i] = relationName[i];
-        //   }
-        // inf->relationName = rn;
 
         //set up other attributes
         strncpy(inf->relationName, relationName.c_str(), 20);
@@ -100,6 +94,9 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
         rootPageNum = root_page_id; // assign root page id
         inf->rootPageNo = root_page_id;
 
+        //assign index file
+        file = blobfile;
+        
         // insert entries for every tuple in the base relation
         FileScan fscan(relationName, bufMgrIn);
 
@@ -120,8 +117,7 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
             std::cout << "Read all records" << std::endl;
         }
     }
-
-    file = blobfile;
+    
     outIndexName = indexName;
 }
 
@@ -231,6 +227,11 @@ const void BTreeIndex::startScan(const void *lowValParm,
                                  const void *highValParm,
                                  const Operator highOpParm)
 {
+    lowValInt = *((int *)lowValParm);
+    highValInt = *((int *)highValParm);
+    lowOp = lowOpParm;
+    highOp = highOpParm;
+    
     if (lowValInt > highValInt)
     {
         throw BadScanrangeException();
@@ -245,11 +246,6 @@ const void BTreeIndex::startScan(const void *lowValParm,
     {
         throw BadOpcodesException();
     }
-
-    lowValInt = *((int *)lowValParm);
-    highValInt = *((int *)highValParm);
-    lowOp = lowOpParm;
-    highOp = highOpParm;
 
     Page *nt_page;
     bufMgr->readPage(file, rootPageNum, nt_page);
@@ -443,13 +439,12 @@ const void BTreeIndex::endScan()
 //
 const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const void *keyPtr, const RecordId rid, bool &splited, bool &childLeaf, PageId &newPageId)
 {
-    // key and node of current page
-    int key = *((int *)keyPtr);
+
     NonLeafNodeInt *node = (NonLeafNodeInt *)page;
 
     if (isRoot && node->keyArray[0] == INT8_MAX)
     {
-        node->keyArray[0] = key;
+        node->keyArray[0] = *(int *)keyPtr;
     }
 
     int index; // index of node in pageNoArray to recurse on
@@ -468,6 +463,8 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
         PageId pageIdFromChild;
         bool childsplited;
         bool fromLeaf;
+        ((NonLeafNodeInt *)child)->level = level + 1
+        
         recurseInsert(child, ((NonLeafNodeInt *)child)->level, false, keyPtr, rid, childsplited, fromLeaf, pageIdFromChild);
 
         if (childsplited)
@@ -550,7 +547,7 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
             }
 
             //actually insert the entry
-            leaf->keyArray[index] = key;
+            leaf->keyArray[index] = *(int *)keyPtr;
             leaf->ridArray[index].page_number = rid.page_number;
             leaf->ridArray[index].slot_number = rid.slot_number;
         }
@@ -579,7 +576,7 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
                 }
 
                 //actually insert the record
-                newLeaf->keyArray[index] = key;
+                newLeaf->keyArray[index] = *(int *)keyPtr;
                 newLeaf->ridArray[index].page_number = rid.page_number;
                 newLeaf->ridArray[index].slot_number = rid.slot_number;
 
@@ -599,7 +596,7 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
                 }
 
                 // insert
-                leaf->keyArray[index] = key;
+                leaf->keyArray[index] = *(int *)keyPtr;
                 leaf->ridArray[index].page_number = rid.page_number;
                 leaf->ridArray[index].slot_number = rid.slot_number;
             }
@@ -615,25 +612,23 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
 //
 const void BTreeIndex::findPageNo(Page *page, const void *keyPtr, int &index)
 {
-    // current key and node
-    int key = *((int *)keyPtr);
     NonLeafNodeInt *node = (NonLeafNodeInt *)page;
 
     // iterate the key array to find the suitable index to recurse on
     for (int i = 0; i < nodeOccupancy; i++)
     {
-        if (key < node->keyArray[0])
+        if (*(int *)keyPtr < node->keyArray[0])
         {
             index = 0;
             return;
         }
-        else if (key >= node->keyArray[i] && (i == nodeOccupancy - 1 || node->keyArray[i + 1] == NULL))
+        else if (*(int *)keyPtr >= node->keyArray[i] && (i == nodeOccupancy - 1 || node->keyArray[i + 1] == NULL))
         {
             // reach the end of the array
             index = i + 1;
             return;
         }
-        else if (key >= node->keyArray[i] && key < node->keyArray[i + 1])
+        else if (*(int *)keyPtr >= node->keyArray[i] && *(int *)keyPtr < node->keyArray[i + 1])
         {
             // key is between keyarray[i] and keyarray[i+1]
             index = i + 1;
@@ -649,25 +644,24 @@ const void BTreeIndex::findPageNo(Page *page, const void *keyPtr, int &index)
 const void BTreeIndex::findKey(Page *leafPage, const void *keyPtr, int &index)
 {
     // current key and node
-    int key = *((int *)keyPtr);
     LeafNodeInt *leaf = (LeafNodeInt *)leafPage;
 
     // iterate the key array to find the suitable index to recurse on
     // assume no duplicate key
     for (int i = 0; i < leafOccupancy; i++)
     {
-        if (leaf->keyArray[0] == INT8_MAX || key < leaf->keyArray[0])
+        if (leaf->keyArray[0] == INT8_MAX || *(int *)keyPtr< leaf->keyArray[0])
         {
             index = 0;
             return;
         }
-        else if (key > leaf->keyArray[i] && (i == leafOccupancy - 1 || leaf->keyArray[i + 1] == INT8_MAX))
+        else if (*((int *)keyPtr) > leaf->keyArray[i] && (i == leafOccupancy - 1 || leaf->keyArray[i + 1] == INT8_MAX))
         {
             // reach the end of the array
             index = i + 1;
             return;
         }
-        else if (key > leaf->keyArray[i] && key < leaf->keyArray[i + 1])
+        else if (*((int *)keyPtr) > leaf->keyArray[i] && *((int *)keyPtr)< leaf->keyArray[i + 1])
         {
             // key is between keyarray[i] and keyarray[i+1]
             index = i + 1;
@@ -683,7 +677,6 @@ const void BTreeIndex::findKey(Page *leafPage, const void *keyPtr, int &index)
 const void BTreeIndex::insertNonLeaf(Page *page, const void *keyPtr, PageId pageId)
 {
     // current key and node
-    int key = *((int *)keyPtr);
     NonLeafNodeInt *node = (NonLeafNodeInt *)page;
 
     // iterate the key array to find where to insert
@@ -691,11 +684,11 @@ const void BTreeIndex::insertNonLeaf(Page *page, const void *keyPtr, PageId page
     {
         if (node->keyArray[i] == INT8_MAX)
         {
-            node->keyArray[i] = key;
+            node->keyArray[i] = *((int *)keyPtr);
             node->pageNoArray[i + 1] = pageId;
             return;
         }
-        else if (key < node->keyArray[i])
+        else if (*((int *)keyPtr) < node->keyArray[i])
         {
             // shift the later part of the array
             for (int j = nodeOccupancy - 1; j > i; j--)
@@ -704,7 +697,7 @@ const void BTreeIndex::insertNonLeaf(Page *page, const void *keyPtr, PageId page
                 node->pageNoArray[j + 1] = node->pageNoArray[j];
             }
             // insert
-            node->keyArray[i] = key;
+            node->keyArray[i] = *((int *)keyPtr);
             node->pageNoArray[i + 1] = pageId;
             return;
         }
@@ -717,7 +710,6 @@ const void BTreeIndex::insertNonLeaf(Page *page, const void *keyPtr, PageId page
 //
 const void BTreeIndex::split(Page *fullPage, bool isLeaf, const void *keyPtr, PageId newPageIdChild, PageId &newPageId)
 {
-    int key = *((int *)keyPtr); // current key
     int middleIndex;            // records the middle index to split
 
     if (isLeaf)
@@ -813,15 +805,14 @@ const void BTreeIndex::findMiddle(Page *page, bool isLeaf, const void *keyPtr, i
     if (isLeaf)
     {
         LeafNodeInt *leaf = (LeafNodeInt *)page;
-        int key = *((int *)keyPtr);
         if (leafOccupancy % 2 == 0)
         {
-            if (key > leaf->keyArray[leafOccupancy / 2 - 1] && key < leaf->keyArray[leafOccupancy / 2])
+            if (*((int *)keyPtr) > leaf->keyArray[leafOccupancy / 2 - 1] && *((int *)keyPtr) < leaf->keyArray[leafOccupancy / 2])
             {
-                middleInt = key;
+                middleInt = *((int *)keyPtr);
                 middleIndex = leafOccupancy / 2;
             }
-            else if (key > leaf->keyArray[leafOccupancy / 2])
+            else if (*((int *)keyPtr) > leaf->keyArray[leafOccupancy / 2])
             {
                 middleInt = (leaf->keyArray[leafOccupancy / 2]);
                 middleIndex = leafOccupancy / 2;
@@ -842,21 +833,20 @@ const void BTreeIndex::findMiddle(Page *page, bool isLeaf, const void *keyPtr, i
     {
         // current node and key
         NonLeafNodeInt *node = (NonLeafNodeInt *)page;
-        int key = *((int *)keyPtr);
 
         if (nodeOccupancy % 2 == 0)
         {
-            if (key > node->keyArray[nodeOccupancy / 2 - 1] && key < node->keyArray[nodeOccupancy / 2])
+            if (*((int *)keyPtr) > node->keyArray[nodeOccupancy / 2 - 1] && *((int *)keyPtr) < node->keyArray[nodeOccupancy / 2])
             {
-                middleInt = key;
+                middleInt = *((int *)keyPtr);
                 middleIndex = nodeOccupancy / 2 - 1;
             }
-            else if (key > node->keyArray[nodeOccupancy / 2])
+            else if (*((int *)keyPtr) > node->keyArray[nodeOccupancy / 2])
             {
                 middleInt = (node->keyArray[nodeOccupancy / 2]);
                 middleIndex = nodeOccupancy / 2;
             }
-            else if (key < node->keyArray[nodeOccupancy / 2 - 1])
+            else if (*((int *)keyPtr) < node->keyArray[nodeOccupancy / 2 - 1])
             {
                 middleInt = (node->keyArray[nodeOccupancy / 2 - 1]);
                 middleIndex = nodeOccupancy / 2 - 1;
@@ -865,22 +855,22 @@ const void BTreeIndex::findMiddle(Page *page, bool isLeaf, const void *keyPtr, i
         }
         else
         {
-            if (key > node->keyArray[nodeOccupancy / 2 - 1] && key < node->keyArray[nodeOccupancy / 2])
+            if (*((int *)keyPtr) > node->keyArray[nodeOccupancy / 2 - 1] && *((int *)keyPtr) < node->keyArray[nodeOccupancy / 2])
             {
-                middleInt = key;
+                middleInt = *((int *)keyPtr);
                 middleIndex = nodeOccupancy / 2 - 1;
             }
-            else if (key > node->keyArray[nodeOccupancy / 2] && key < node->keyArray[nodeOccupancy / 2 + 1])
+            else if (*((int *)keyPtr) > node->keyArray[nodeOccupancy / 2] && *((int *)keyPtr) < node->keyArray[nodeOccupancy / 2 + 1])
             {
-                middleInt = key;
+                middleInt = *((int *)keyPtr);
                 middleIndex = nodeOccupancy / 2;
             }
-            else if (key < node->keyArray[nodeOccupancy / 2 - 1])
+            else if (*((int *)keyPtr) < node->keyArray[nodeOccupancy / 2 - 1])
             {
                 middleInt = (node->keyArray[nodeOccupancy / 2 - 1]);
                 middleIndex = nodeOccupancy / 2 - 1;
             }
-            else if (key > node->keyArray[nodeOccupancy / 2])
+            else if (*((int *)keyPtr) > node->keyArray[nodeOccupancy / 2])
             {
                 middleInt = (node->keyArray[nodeOccupancy / 2]);
                 middleIndex = nodeOccupancy / 2;
