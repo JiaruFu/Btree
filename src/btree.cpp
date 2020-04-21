@@ -36,7 +36,7 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
     this->bufMgr = bufMgrIn;
     this->attributeType = attrType;
     this->attrByteOffset = attrByteOffset;
-
+    scanIsExecuting = false;
     BlobFile *blobfile;
 
     std ::ostringstream idxStr;
@@ -137,7 +137,8 @@ BTreeIndex::~BTreeIndex()
       filePageIter = file->begin();
     }
     */
-
+    scanIsExecuting = false;
+    bufMgr->unPinPage(file, (*filePageIter).page_number(), curDirtyFlag);
     bufMgr->flushFile(file);
     // file -> close();
 }
@@ -232,19 +233,10 @@ const void BTreeIndex::startScan(const void *lowValParm,
     lowOp = lowOpParm;
     highOp = highOpParm;
     
-    if (lowValInt > highValInt)
+    if (lowValInt > highValInt || lowOpParm != GT && lowOpParm != GTE || highOpParm != LT && highOpParm != LTE)
     {
+	scanIsExecuting = false;
         throw BadScanrangeException();
-    }
-
-    if (lowOpParm != GT && lowOpParm != GTE)
-    {
-        throw BadOpcodesException();
-    }
-
-    if (highOpParm != LT && highOpParm != LTE)
-    {
-        throw BadOpcodesException();
     }
 
     Page *nt_page;
@@ -254,14 +246,14 @@ const void BTreeIndex::startScan(const void *lowValParm,
 
     int index;
 
-    if (scanExecuting)
+    if (scanIsExecuting)
     {
         // If another scan is already executing, that needs to be ended here.
         this->endScan();
     }
     else
     {
-
+	scanIsExecuting = true;
         startScanHeler(nt_page, lowValInt, index);
         //get the parent leaf node page that contains the first record!!!
 
@@ -337,7 +329,7 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
 
 const void BTreeIndex::scanNext(RecordId &outRid)
 {
-    if (!scanExecuting)
+    if (!scanIsExecuting)
     {
         throw ScanNotInitializedException();
     }
@@ -417,10 +409,14 @@ const void BTreeIndex::scanNext(RecordId &outRid)
 //
 const void BTreeIndex::endScan()
 {
-    if (!scanExecuting)
+    if (!scanIsExecuting)
     {
         throw ScanNotInitializedException();
     }
+
+	bufMgr->unPinPage(file, (*filePageIter.page_number(), curDirtyFlag);
+	// stop executing the scan
+	scanIsExecuting = false;
 
     /*  // Unpin any pinned pages. Reset scan specific variables.
     if (curPage != NULL)
