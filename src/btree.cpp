@@ -731,14 +731,13 @@ const void BTreeIndex::split(Page *fullPage, bool isLeaf, const void *keyPtr, Pa
         bufMgr->unPinPage(file, newPageId, true);
         
         //PRINT the leaf after split
-        std::cout << "Old leaf" << std::endl;
+        std::cout << std::endl << "Old leaf" << std::endl;
 
                 for (const auto& value: fullLeaf->keyArray) {
                            std::cout << value << ' ';
                        }
 
-
-        std::cout << "New leaf" << std::endl;
+        std::cout << std::endl << "New leaf" << std::endl;
                 for (const auto& value: newLeaf->keyArray) {
                            std::cout << value << ' ';
                        }
