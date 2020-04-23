@@ -225,11 +225,17 @@ const void BTreeIndex::startScan(const void *lowValParm,
       highOp = highOpParm;
       
 
-      if ((lowValInt > highValInt) || (lowOpParm != GT && lowOpParm != GTE) || (highOpParm != LT && highOpParm != LTE))
+      if (lowValInt > highValInt)
       {
       scanExecuting = false;
           throw BadScanrangeException();
       }
+
+      if((lowOpParm != GT && lowOpParm != GTE) || (highOpParm != LT && highOpParm != LTE)){
+
+		 scanExecuting = false;
+		 throw BadOpcodesException();
+	}
 
       Page *nt_page;
       bufMgr->readPage(file, rootPageNum, nt_page);
@@ -264,16 +270,22 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
 {
     NonLeafNodeInt *np = (NonLeafNodeInt *)nl;
     int level = np->level;
-    int length = sizeof(np->keyArray) / sizeof(np->keyArray[0]);
+
+     std::cout << std::endl << "root:" << std::endl;
+     for (const auto& value: np->keyArray) {
+                    std::cout << value << ' ';
+        }
+
+   // int length = sizeof(np->keyArray) / sizeof(np->keyArray[0]);
     // int ka[length] = np->keyArray;
 
     int cur_index;
-    for (int i = 0; i < length; i++)
+    for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
     {
         // if(ka[i] >= lowValParm){
         if (np->keyArray[i] >= lowValParm)
         {
-            if (i + 1 < length)
+            if (i + 1 < INTARRAYNONLEAFSIZE)
             {
                 if (np->keyArray[i + 1] < lowValParm)
                 {
@@ -287,12 +299,14 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
             cur_index = i;
             break;
         }
-        else if (i == length - 1 && np->keyArray[i] < lowValParm)
+        else if (i == INTARRAYNONLEAFSIZE - 1 && np->keyArray[i] < lowValParm)
         {
             cur_index = i + 1;
             break;
         }
     }
+    std::cout<<"cur_inedx"<<cur_index<<std::endl;
+
 
     if (level == 1)
     {
@@ -301,17 +315,23 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
     }
 
     if (np->pageNoArray[cur_index])
-    {
+    {   
+      
+
         PageId next_page_id = np->pageNoArray[cur_index];
         Page *next_page;
         bufMgr->readPage(file, next_page_id, next_page);
-        this->startScanHeler(next_page, lowValParm, index);
+      
+
+	this->startScanHeler(next_page, lowValParm, index);
+  // 	 bufMgr->unPinPage(file, next_page, false);
     }
     else
     {
         //  If there is no key in the B+ tree that satisfies the scan criteria.
         throw NoSuchKeyFoundException();
     }
+   // bufMgr->unPinPage(file, next_page, false);
 }
 
 // -----------------------------------------------------------------------------
@@ -877,4 +897,3 @@ const void BTreeIndex::findMiddle(Page *page, bool isLeaf, const void *keyPtr, i
 }
 
 } // namespace badgerdb
-
