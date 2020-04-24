@@ -336,18 +336,21 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
         std::cout << value << ' ';
     }
 
+    std::cout<<"np->keyArray[i] "<<np->keyArray[0]<<std::endl;
+
     // int length = sizeof(np->keyArray) / sizeof(np->keyArray[0]);
     // int ka[length] = np->keyArray;
 
     int cur_index;
     for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
-    {
+    {  
+	     std::cout<<lowValParm<<std::endl;
         // if(ka[i] >= lowValParm){
-        if (np->keyArray[i] >= lowValParm)
+        if ( np->keyArray[i] <= lowValParm)
         {
             if (i + 1 < INTARRAYNONLEAFSIZE)
             {
-                if (np->keyArray[i + 1] < lowValParm)
+                if (np->keyArray[i + 1] > lowValParm)
                 {
                     cur_index = i + 1;
                     break;
@@ -355,7 +358,7 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
             }
         }
         else if (i == 0 && np->keyArray[i] > lowValParm)
-        {
+        {  
             cur_index = i;
             break;
         }
@@ -463,7 +466,7 @@ const void BTreeIndex::scanNext(RecordId &outRid)
         }
         if (!found)
         {
-            std::cout << "right" << ((LeafNodeInt *)currentPageData)->rightSibPageNo <<std::endl;
+           // std::cout << "right" << ((LeafNodeInt *)currentPageData)->rightSibPageNo <<std::endl;
             if (((LeafNodeInt *)currentPageData)->rightSibPageNo)
             {
                 currentPageNum = ((LeafNodeInt *)currentPageData)->rightSibPageNo;
