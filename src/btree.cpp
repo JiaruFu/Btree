@@ -216,6 +216,7 @@ const void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 
             //we know this can never be just above the leaves so set level to 0
             newRoot->level = 0;
+	    rootPageNum = newRootPageId;
 
             //null eveything in this new page
             newRoot->pageNoArray[INTARRAYNONLEAFSIZE] = NULL;
@@ -416,13 +417,24 @@ const void BTreeIndex::scanNext(RecordId &outRid)
         }
     }
 
+    std::cout<<"lowValInt"<<index_low<<std::endl;
+     std::cout << std::endl
+                  << "final" << std::endl;
+
+      for (const auto &value : leaf->keyArray)
+        {
+            std::cout << value << ' ';
+        }
+    //std::cout<<((LeafNodeInt *)currentPageData)->keyArray[0]<<std::endl;
     bool found = false;
     int x = 0;
     while (!found)
     { 
-
+	   // std::cout<<"haj"<<std::end;
+       // length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
+        // ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
         for (int i = 0; i < INTARRAYLEAFSIZE; i++)
-        {
+        {  //std::cout<<"INTARRAYLEAFSIZE"<<std::endl;
 
             if (highValInt == ((LeafNodeInt *)currentPageData)->keyArray[i])
             {
@@ -442,9 +454,9 @@ const void BTreeIndex::scanNext(RecordId &outRid)
         }
         if (!found)
         {
-            if (leaf->rightSibPageNo)
+            if (((LeafNodeInt *)currentPageData)->rightSibPageNo)
             {
-                currentPageNum = leaf->rightSibPageNo;
+                currentPageNum = ((LeafNodeInt *)currentPageData)->rightSibPageNo;
                 bufMgr->readPage(file, currentPageNum, currentPageData);
             }
             else
@@ -484,6 +496,15 @@ const void BTreeIndex::endScan()
 const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const void *keyPtr, const RecordId rid, bool &splited, bool &childLeaf, PageId &newPageId)
 {
     NonLeafNodeInt *node = (NonLeafNodeInt *)page;
+
+
+     std::cout << std::endl
+                  << "node" << std::endl;
+
+        for (const auto &value :  node->keyArray)
+        {
+            std::cout << value << ' ';
+        }
 
     if (isRoot && node->keyArray[0] != NULL)
     {
