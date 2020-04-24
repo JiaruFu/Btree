@@ -140,7 +140,7 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
         try
         {
             RecordId scanRid;
-            while(1)
+            while (1)
             {
                 fscan.scanNext(scanRid);
                 std::string recordStr = fscan.getRecord();
@@ -199,10 +199,10 @@ const void BTreeIndex::insertEntry(const void *key, const RecordId rid)
     {
         if (rootNode->keyArray[INTARRAYNONLEAFSIZE - 1] == NULL)
         {
-            std::cout<< "middle:" << middleInt << std::endl;
+            std::cout << "middle:" << middleInt << std::endl;
             //enough room
             this->insertNonLeaf(rootPage, (void *)&middleInt, newPageId);
-            
+
             //print
             NonLeafNodeInt *node = (NonLeafNodeInt *)rootPage;
             std::cout << std::endl
@@ -336,17 +336,17 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
         std::cout << value << ' ';
     }
 
-    std::cout<<"np->keyArray[i] "<<np->keyArray[0]<<std::endl;
+    std::cout << "np->keyArray[i] " << np->keyArray[0] << std::endl;
 
     // int length = sizeof(np->keyArray) / sizeof(np->keyArray[0]);
     // int ka[length] = np->keyArray;
 
     int cur_index;
     for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
-    {  
-	     std::cout<<lowValParm<<std::endl;
+    {
+        std::cout << lowValParm << std::endl;
         // if(ka[i] >= lowValParm){
-        if ( np->keyArray[i] <= lowValParm)
+        if (np->keyArray[i] <= lowValParm)
         {
             if (i + 1 < INTARRAYNONLEAFSIZE)
             {
@@ -358,7 +358,7 @@ const void BTreeIndex::startScanHeler(Page *nl, int lowValParm, int &index)
             }
         }
         else if (i == 0 && np->keyArray[i] > lowValParm)
-        {  
+        {
             cur_index = i;
             break;
         }
@@ -403,86 +403,138 @@ const void BTreeIndex::scanNext(RecordId &outRid)
         throw ScanNotInitializedException();
     }
 
-    int index_low = 0;
-    int large_index = 0;
-
-    //iterate through leaf page before going to the next page
-    // int length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
-    // int ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
     LeafNodeInt *leaf = (LeafNodeInt *)currentPageData;
-
-    for (int i = 0; i < INTARRAYLEAFSIZE; i++)
+    if (leaf->ridArray[nextEntry].page_number == 0 or nextEntry == leafOccupancy)
     {
-        if (lowValInt == leaf->keyArray[i])
-        {
-            if (lowOp == GTE)
-            {
-                index_low = i;
-            }
-            else
-            {
-                if (i + 1 < INTARRAYLEAFSIZE)
-                {
-                    index_low = i + 1;
-                }
-            }
-        }
-    }
-
-    std::cout << "lowValInt" << index_low << std::endl;
-    std::cout << std::endl
-              << "final" << std::endl;
-
-    //std::cout<<((LeafNodeInt *)currentPageData)->keyArray[0]<<std::endl;
-    bool found = false;
-    int x = 0;
-    while (!found)
-    {
-        for (const auto &value : leaf->keyArray)
-        {
-            std::cout << value << ' ';
-        }
-        // std::cout<<"haj"<<std::end;
-        // length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
-        // ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
-        for (int i = 0; i < INTARRAYLEAFSIZE; i++)
-        { //std::cout<<"INTARRAYLEAFSIZE"<<std::endl;
-
-            if (highValInt == ((LeafNodeInt *)currentPageData)->keyArray[i])
-            {
-                if (highOp == LTE)
-                {
-                    large_index = i;
-                    found = true;
-                    break;
-                }
-                else
-                {
-                    large_index = i - 1;
-                    found = true;
-                    break;
-                }
-            }
-        }
-        if (!found)
-        {
-           // std::cout << "right" << ((LeafNodeInt *)currentPageData)->rightSibPageNo <<std::endl;
-            if (((LeafNodeInt *)currentPageData)->rightSibPageNo)
-            {
-                currentPageNum = ((LeafNodeInt *)currentPageData)->rightSibPageNo;
-                bufMgr->readPage(file, currentPageNum, currentPageData);
-            }
-            else
-            {
-                throw IndexScanCompletedException();
-            }
-        }
-        // bufMgr->unPinPage(file, ((LeafNodeInt *)currentPageData)->current_page_number, true);
+        // end of the page
+        // Unpin page and read papge
         bufMgr->unPinPage(file, currentPageNum, false);
+        // No more next leaf
+        if (leaf->rightSibPageNo == 0)
+        {
+            // no more leaf page available
+            throw IndexScanCompletedException();
+        }
+        currentPageNum = leaf->rightSibPageNo;
+        bufMgr->readPage(file, currentPageNum, currentPageData);
+        leaf = (LeafNodeInt *)currentPageData;
+        // Reset nextEntry
+        nextEntry = 0;
     }
 
-    //get the records
-    outRid = ((LeafNodeInt *)currentPageData)->ridArray[large_index];
+    // find the rid satisfy op
+    int key = leaf->keyArray[nextEntry];
+    // check whether satisfy
+    bool satisfy = false;
+    if (lowOp == GTE && highOp == LTE)
+    {
+        satisfy =  key <= highValInt && key >= lowValInt;
+    }
+    else if (lowOp == GT && highOp == LTE)
+    {
+        satisfy =  key <= highValInt && key > lowValInt;
+    }
+    else if (lowOp == GTE && highOp == LT)
+    {
+        satisfy = key < highValInt && key >= lowValInt;
+    }
+    else
+    {
+        satisfy =  key < highValInt && key > lowValInt;
+    }
+
+    if(satisfy)
+    {
+        outRid = leaf->ridArray[nextEntry];
+        nextEntry ++;
+    }
+    else
+    {
+        throw IndexScanCompletedException();
+    }
+    
+    // int index_low = 0;
+    // int large_index = 0;
+
+    // //iterate through leaf page before going to the next page
+    // // int length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
+    // // int ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
+    // LeafNodeInt *leaf = (LeafNodeInt *)currentPageData;
+
+    // for (int i = 0; i < INTARRAYLEAFSIZE; i++)
+    // {
+    //     if (lowValInt == leaf->keyArray[i])
+    //     {
+    //         if (lowOp == GTE)
+    //         {
+    //             index_low = i;
+    //         }
+    //         else
+    //         {
+    //             if (i + 1 < INTARRAYLEAFSIZE)
+    //             {
+    //                 index_low = i + 1;
+    //             }
+    //         }
+    //     }
+    // }
+
+    // std::cout << "lowValInt" << index_low << std::endl;
+    // std::cout << std::endl
+    //           << "final" << std::endl;
+
+    // //std::cout<<((LeafNodeInt *)currentPageData)->keyArray[0]<<std::endl;
+    // bool found = false;
+    // int x = 0;
+    // while (!found)
+    // {
+    //     std::cout << "current" << currentPageNum <<std::endl;
+    //     for (const auto &value : leaf->keyArray)
+    //     {
+    //         std::cout << value << ' ';
+    //     }
+    //     // std::cout<<"haj"<<std::end;
+    //     // length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
+    //     // ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
+    //     for (int i = 0; i < INTARRAYLEAFSIZE; i++)
+    //     { //std::cout<<"INTARRAYLEAFSIZE"<<std::endl;
+
+    //         if (highValInt == ((LeafNodeInt *)currentPageData)->keyArray[i])
+    //         {
+    //             if (highOp == LTE)
+    //             {
+    //                 large_index = i;
+    //                 found = true;
+    //                 break;
+    //             }
+    //             else
+    //             {
+    //                 large_index = i - 1;
+    //                 found = true;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     if (!found)
+    //     {
+    //         std::cout << "right" << ((LeafNodeInt *)currentPageData)->rightSibPageNo <<std::endl;
+    //         if (((LeafNodeInt *)currentPageData)->rightSibPageNo)
+    //         {
+    //             currentPageNum = ((LeafNodeInt *)currentPageData)->rightSibPageNo;
+    //             bufMgr->readPage(file, currentPageNum, currentPageData);
+    //             bufMgr->unPinPage(file, currentPageNum, false);
+    //         }
+    //         else
+    //         {
+    //             throw IndexScanCompletedException();
+    //         }
+    //     }
+    //     // bufMgr->unPinPage(file, ((LeafNodeInt *)currentPageData)->current_page_number, true);
+    //     // bufMgr->unPinPage(file, currentPageNum, false);
+    // }
+
+    // //get the records
+    // outRid = ((LeafNodeInt *)currentPageData)->ridArray[large_index];
 }
 
 // -----------------------------------------------------------------------------
