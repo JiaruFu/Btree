@@ -297,10 +297,14 @@ const void BTreeIndex::startScan(const void *lowValParm,
         scanExecuting = true;
         startScanHeler(nt_page, lowValInt, index);
         //get the parent leaf node page that contains the first record!!!
-        Page *leafPage;
-        PageId leafPageId = ((NonLeafNodeInt *)nt_page)->pageNoArray[index];
-        bufMgr->readPage(file, leafPageId, leafPage);
-        LeafNodeInt *leaf = (LeafNodeInt *)leafPage;
+       
+	
+//	Page *leafPage;
+        currentPageNum = ((NonLeafNodeInt *)nt_page)->pageNoArray[index];
+
+        bufMgr->readPage(file, currentPageNum, currentPageData);
+       // LeafNodeInt *leaf = (LeafNodeInt *)leafPage;
+	 
     }
 }
 
@@ -390,16 +394,13 @@ const void BTreeIndex::scanNext(RecordId &outRid)
     int large_index = 0;
 
     //iterate through leaf page before going to the next page
-    int length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
+   // int length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
     // int ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
     LeafNodeInt *leaf = (LeafNodeInt *) currentPageData;
-    std::cout << "a" << std::endl;
-    std::cout << leaf->keyArray[0] <<std::endl;
-    std::cout << "b" << std::endl;
 
-    for (int i = 0; i < length; i++)
+    for (int i = 0; i < INTARRAYLEAFSIZE; i++)
     {
-        if (lowValInt == ((LeafNodeInt *)currentPageData)->keyArray[i])
+        if (lowValInt == leaf->keyArray[i])
         {
             if (lowOp == GTE)
             {
@@ -407,7 +408,7 @@ const void BTreeIndex::scanNext(RecordId &outRid)
             }
             else
             {
-                if (i + 1 < length)
+                if (i + 1 < INTARRAYLEAFSIZE)
                 {
                     index_low = i + 1;
                 }
@@ -416,13 +417,13 @@ const void BTreeIndex::scanNext(RecordId &outRid)
     }
 
     bool found = false;
-
+    int x = 0;
     while (!found)
-    {
-        length = sizeof(((LeafNodeInt *)currentPageData)->keyArray) / sizeof(((LeafNodeInt *)currentPageData)->keyArray[0]);
-        // ka[length] = ((LeafNodeInt *)currentPageData)->keyArray;
-        for (int i = 0; i < length; i++)
+    { 
+
+        for (int i = 0; i < INTARRAYLEAFSIZE; i++)
         {
+
             if (highValInt == ((LeafNodeInt *)currentPageData)->keyArray[i])
             {
                 if (highOp == LTE)
@@ -441,9 +442,9 @@ const void BTreeIndex::scanNext(RecordId &outRid)
         }
         if (!found)
         {
-            if (((LeafNodeInt *)currentPageData)->rightSibPageNo)
+            if (leaf->rightSibPageNo)
             {
-                currentPageNum = ((LeafNodeInt *)currentPageData)->rightSibPageNo;
+                currentPageNum = leaf->rightSibPageNo;
                 bufMgr->readPage(file, currentPageNum, currentPageData);
             }
             else
