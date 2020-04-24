@@ -359,7 +359,7 @@ public:
       * @param isParent  Boolean value to check if it is the parents of leaf node
         * @throws  NoSuchKeyFoundException If there is no key in the B+ tree that satisfies the scan criteria.
        **/
-  const void startScanHeler(Page *nl, int lowValParm, int &index);
+  const void startScanHeler(Page *nl, const void *lowValParm, int &index);
     
   /**
      * Fetch the record id of the next index entry that matches the scan.
