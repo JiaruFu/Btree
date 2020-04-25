@@ -60,6 +60,8 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
         {
             throw BadIndexInfoException("BadIndexInfoException");
         }
+
+        bufMgr->unPinPage(blobfile, first_page_id, true);
     }
     else
     {
@@ -165,16 +167,13 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
 BTreeIndex::~BTreeIndex()
 {
 
-    this->endScan();
-    // generally must unpin last page of the scan
-
-    if (scanExecuting)
-    {
-        scanExecuting = false;
-    }
-
-    bufMgr->flushFile(file);
+    scanExecuting = false;
+    bufMgr->unPinPage(file, rootPageNum, true);
+    std::cout << "flush" << std::endl;
+    bufMgr->flushFile(BTreeIndex::file);
     delete file;
+	file = nullptr;
+    std::cout << "ded" << std::endl;
 }
 
 // -----------------------------------------------------------------------------
@@ -269,6 +268,7 @@ const void BTreeIndex::insertEntry(const void *key, const RecordId rid)
             bufMgr->unPinPage(file, headerPageNum, true);
         }
     }
+    bufMgr->unPinPage(file, rootPageNum, true);
 }
 
 // -----------------------------------------------------------------------------
@@ -287,14 +287,14 @@ const void BTreeIndex::startScan(const void *lowValParm,
 
     if (lowValInt > highValInt)
     {
-        scanExecuting = false;
+        // scanExecuting = false;
         throw BadScanrangeException();
     }
 
     if ((lowOpParm != GT && lowOpParm != GTE) || (highOpParm != LT && highOpParm != LTE))
     {
 
-        scanExecuting = false;
+        // scanExecuting = false;
         throw BadOpcodesException();
     }
 
@@ -309,20 +309,25 @@ const void BTreeIndex::startScan(const void *lowValParm,
         // If another scan is already executing, that needs to be ended here.
         this->endScan();
     }
-    else
-    {
-        scanExecuting = true;
-        startScanHeler(nt_page, lowValParm, index);
-        //unpin root page
-        bufMgr->unPinPage(file, rootPageNum, false);
-        //get the parent leaf node page that contains the first record!!!
-        // nextEntry = index;
-        //	Page *leafPage;
-        // currentPageNum = ((NonLeafNodeInt *)nt_page)->pageNoArray[index];
 
-        // bufMgr->readPage(file, currentPageNum, currentPageData);
-        // LeafNodeInt *leaf = (LeafNodeInt *)leafPage;
-    }
+    startScanHeler(nt_page, lowValParm, index);
+    //unpin root page
+    bufMgr->unPinPage(file, rootPageNum, false);
+    scanExecuting = true; // not error thrown within helper, start
+    // else
+    // {
+    //     startScanHeler(nt_page, lowValParm, index);
+    //     //unpin root page
+    //     bufMgr->unPinPage(file, rootPageNum, false);
+    //     scanExecuting = true; // not error thrown within helper, start
+    //     //get the parent leaf node page that contains the first record!!!
+    //     // nextEntry = index;
+    //     //	Page *leafPage;
+    //     // currentPageNum = ((NonLeafNodeInt *)nt_page)->pageNoArray[index];
+
+    //     // bufMgr->readPage(file, currentPageNum, currentPageData);
+    //     // LeafNodeInt *leaf = (LeafNodeInt *)leafPage;
+    // }
 }
 
 // -----------------------------------------------------------------------------
@@ -332,6 +337,7 @@ const void BTreeIndex::startScan(const void *lowValParm,
 
 const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &index)
 {
+    
     NonLeafNodeInt *np = (NonLeafNodeInt *)nl;
     int level = np->level;
     // std::cout << "LEVEL: " << level << std::endl;
@@ -370,12 +376,12 @@ const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &ind
         bool found = false;
         while (!found)
         {
-            std::cout << std::endl
-                      << "leafid:" << leafId << std::endl;
-            for (const auto &value : leaf->keyArray)
-            {
-                std::cout << value << ' ';
-            }
+            // std::cout << std::endl
+            //           << "leafid:" << leafId << std::endl;
+            // for (const auto &value : leaf->keyArray)
+            // {
+            //     std::cout << value << ' ';
+            // }
             
             // iterate through the key on the leaf
             for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
@@ -436,12 +442,10 @@ const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &ind
                 {
                     // no more key available, throw exception
                     // found = true; //break the loop
-                    // stop executing the scan
-                    scanExecuting = false;
                     //reset variables
-                    currentPageData = nullptr;
-                    currentPageNum = static_cast<PageId>(-1);
-                    nextEntry = -1;
+                    // currentPageData = nullptr;
+                    // currentPageNum = static_cast<PageId>(-1);
+                    // nextEntry = -1;
                     throw NoSuchKeyFoundException();
                 }
             }
@@ -666,19 +670,25 @@ const void BTreeIndex::scanNext(RecordId &outRid)
 //
 const void BTreeIndex::endScan()
 {
+    std::cout << "end......"<< std::endl;
     if (!scanExecuting)
     {
+        std::cout << "end_not"<< std::endl;
         throw ScanNotInitializedException();
     }
+    else
+    {
+        // FileIterator filePageIter((PageFile *)file);
+        bufMgr->unPinPage(file, currentPageNum, false);
+        // stop executing the scan
+        scanExecuting = false;
+        //reset variables
+        currentPageData = nullptr;
+        currentPageNum = static_cast<PageId>(-1);
+        nextEntry = -1;
+        std::cout << "ended"<< std::endl;
+    }
 
-    // FileIterator filePageIter((PageFile *)file);
-    bufMgr->unPinPage(file, currentPageNum, false);
-    // stop executing the scan
-    scanExecuting = false;
-    //reset variables
-    currentPageData = nullptr;
-    currentPageNum = static_cast<PageId>(-1);
-    nextEntry = -1;
 }
 
 // -----------------------------------------------------------------------------
