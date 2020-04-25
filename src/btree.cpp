@@ -171,9 +171,8 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
 
 BTreeIndex::~BTreeIndex()
 {
-
     scanExecuting = false;
-    bufMgr->unPinPage(file, rootPageNum, true);
+    // bufMgr->unPinPage(file, rootPageNum, true);   
     std::cout << "flush" << std::endl;
     bufMgr->flushFile(file);
     delete file;
@@ -451,6 +450,7 @@ const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &ind
                     // currentPageData = nullptr;
                     // currentPageNum = static_cast<PageId>(-1);
                     // nextEntry = -1;
+                    bufMgr->unPinPage(file, rootPageNum, false);
                     throw NoSuchKeyFoundException();
                 }
             }
@@ -776,6 +776,7 @@ const void BTreeIndex::recurseInsert(Page *page, int level, bool isRoot, const v
                 }
             }
         }
+        bufMgr->unPinPage(file, node->pageNoArray[index], true);
     }
     else
     {
