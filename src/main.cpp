@@ -140,7 +140,8 @@ int main(int argc, char **argv)
 	test1();
 	test2();
 	test3();
-	//errorTests();
+	errorTests();
+	std::cout << "Pass all tests!" << std::endl;
 
   return 1;
 }
