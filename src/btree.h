@@ -201,6 +201,11 @@ private:
   BufMgr *bufMgr;
 
   /**
+   * Meta page
+   */
+  Page *metaPage;
+
+  /**
    * Page number of meta page.
    */
   PageId headerPageNum;
@@ -296,6 +301,7 @@ private:
    * records the value the new page to be split on
    **/
   int middleInt;
+  
 
 public:
   /**
@@ -352,11 +358,8 @@ public:
     /**
       * Start from root to find out the leaf page that contains the first RecordID
       * @param nl    the current page
-      * @param level        the level of current non-leaf page
-      * @param lfn    the leaf node page with reference
       * @param lowValParm    Low value of range, pointer to integer / double / char string
-      * @param low_page_key  the key of page
-      * @param isParent  Boolean value to check if it is the parents of leaf node
+      * @param index to store the index we find
         * @throws  NoSuchKeyFoundException If there is no key in the B+ tree that satisfies the scan criteria.
        **/
   const void startScanHeler(Page *nl, const void *lowValParm, int &index);
