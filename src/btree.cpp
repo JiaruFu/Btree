@@ -39,123 +39,120 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
     this->attrByteOffset = attrByteOffset;
     scanExecuting = false;
 
-
     std ::ostringstream idxStr;
     idxStr << relationName << '.' << attrByteOffset;
     std ::string indexName = idxStr.str(); // indexName is the name of the index file
-    
- 
+
     try
     {
-           
-            file = new BlobFile(indexName, false);
-            headerPageNum = file->getFirstPageNo();
-            Page *metaPage;
-            bufMgr->readPage(file, headerPageNum, metaPage);
-             IndexMetaInfo *inf = (IndexMetaInfo *)metaPage;
+        // try to create new file
+        file = new BlobFile(indexName, false);
+        headerPageNum = file->getFirstPageNo();
+        Page *metaPage;
+        bufMgr->readPage(file, headerPageNum, metaPage);
+        IndexMetaInfo *inf = (IndexMetaInfo *)metaPage;
 
-             std::string str(inf->relationName);
-             std::cout<<(inf->relationName)<<std::endl;
-      
-             if ( strcmp(inf->relationName, relationName.c_str()) != 0 || (inf->attrByteOffset != attrByteOffset) || (inf->attrType != attrType))
-             {
-                 throw BadIndexInfoException("BadIndexInfoException");
-             }
+        // std::string str(inf->relationName);
+        // std::cout << (inf->relationName) << std::endl;
 
-             rootPageNum = inf->rootPageNo;
-             bufMgr->unPinPage(file, headerPageNum, false);
-        
-    }catch (FileExistsException fileExistsException)
-       {
+        if (strcmp(inf->relationName, relationName.c_str()) != 0 || 
+            (inf->attrByteOffset != attrByteOffset) || 
+            (inf->attrType != attrType))
+        {
+            throw BadIndexInfoException(indexName);
+        }
 
-               file = new BlobFile(indexName, true);
+        rootPageNum = inf->rootPageNo;
+        bufMgr->unPinPage(file, headerPageNum, false);
+    }
+    catch (FileExistsException fileExistsException)
+    {
+        file = new BlobFile(indexName, true);
 
-               //create a new meta page
-               Page* metaPage;
-               bufMgr->allocPage(file, headerPageNum, metaPage);
+        //create a new meta page
+        Page *metaPage;
+        bufMgr->allocPage(file, headerPageNum, metaPage);
 
-               IndexMetaInfo *inf = (IndexMetaInfo *)metaPage;
+        IndexMetaInfo *inf = (IndexMetaInfo *)metaPage;
 
-               //set up other attributes
-               strncpy(inf->relationName, relationName.c_str(), 20);
-               inf->attrByteOffset = attrByteOffset;
-               inf->attrType = attrType;
+        //set up other attributes
+        strncpy(inf->relationName, relationName.c_str(), 20);
+        inf->attrByteOffset = attrByteOffset;
+        inf->attrType = attrType;
 
-               //create a root page
-               // PageId root_page_id;
-               // blobfile->allocatePage(root_page_id);
-               Page *rootPage;
-               bufMgr->allocPage(file, rootPageNum, rootPage);
+        //create a root page
+        // PageId root_page_id;
+        // blobfile->allocatePage(root_page_id);
+        Page *rootPage;
+        bufMgr->allocPage(file, rootPageNum, rootPage);
 
-               //initialize the rootNode with two child leaves
-               NonLeafNodeInt *rootNode = (NonLeafNodeInt *)rootPage;
-               rootNode->level = 1;
-               for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
-               {
-                   rootNode->keyArray[i] = INT32_MAX;
-               }
-               for (int i = 0; i < INTARRAYNONLEAFSIZE + 1; i++)
-               {
-                   rootNode->pageNoArray[i] = NULL;
-               }
+        //initialize the rootNode with two child leaves
+        NonLeafNodeInt *rootNode = (NonLeafNodeInt *)rootPage;
+        rootNode->level = 1;
+        for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
+        {
+            rootNode->keyArray[i] = INT32_MAX;
+        }
+        for (int i = 0; i < INTARRAYNONLEAFSIZE + 1; i++)
+        {
+            rootNode->pageNoArray[i] = NULL;
+        }
 
-               //create an empty left leaf page and right leaf page of the attribute type
-               Page *leftLeafPage, *rightLeafPage;
-               PageId leftLeafPageId, rightLeafPageId;
+        //create an empty left leaf page and right leaf page of the attribute type
+        Page *leftLeafPage, *rightLeafPage;
+        PageId leftLeafPageId, rightLeafPageId;
 
-               bufMgr->allocPage(file, leftLeafPageId, leftLeafPage);
-               bufMgr->allocPage(file, rightLeafPageId, rightLeafPage);
+        bufMgr->allocPage(file, leftLeafPageId, leftLeafPage);
+        bufMgr->allocPage(file, rightLeafPageId, rightLeafPage);
 
-               LeafNodeInt *leftLeafNode = (LeafNodeInt *)leftLeafPage;
-               LeafNodeInt *rightLeafNode = (LeafNodeInt *)rightLeafPage;
+        LeafNodeInt *leftLeafNode = (LeafNodeInt *)leftLeafPage;
+        LeafNodeInt *rightLeafNode = (LeafNodeInt *)rightLeafPage;
 
-               //initialize the leaf page
-               for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
-               {
-                   leftLeafNode->keyArray[i] = INT32_MAX;
-                   rightLeafNode->keyArray[i] = INT32_MAX;
-               }
+        //initialize the leaf page
+        for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
+        {
+            leftLeafNode->keyArray[i] = INT32_MAX;
+            rightLeafNode->keyArray[i] = INT32_MAX;
+        }
 
-               leftLeafNode->rightSibPageNo = rightLeafPageId;
-               rightLeafNode->rightSibPageNo = NULL;
+        leftLeafNode->rightSibPageNo = rightLeafPageId;
+        rightLeafNode->rightSibPageNo = NULL;
 
-               rootNode->pageNoArray[0] = leftLeafPageId;
-               rootNode->pageNoArray[1] = rightLeafPageId;
+        rootNode->pageNoArray[0] = leftLeafPageId;
+        rootNode->pageNoArray[1] = rightLeafPageId;
 
-               //unpin the new leaf page. its dirty
-               bufMgr->unPinPage(file, leftLeafPageId, true);
-               bufMgr->unPinPage(file, rightLeafPageId, true);
-               bufMgr->unPinPage(file, rootPageNum, true);
+        //unpin the new leaf page. its dirty
+        bufMgr->unPinPage(file, leftLeafPageId, true);
+        bufMgr->unPinPage(file, rightLeafPageId, true);
+        bufMgr->unPinPage(file, rootPageNum, true);
 
-               // page number of root page
-               // rootPageNum = root_page_id; // assign root page id
-               inf->rootPageNo = rootPageNum;
-               bufMgr->unPinPage(file, headerPageNum, true);
+        // page number of root page
+        // rootPageNum = root_page_id; // assign root page id
+        inf->rootPageNo = rootPageNum;
+        bufMgr->unPinPage(file, headerPageNum, true);
 
+        // insert entries for every tuple in the base relation
+        FileScan fscan(relationName, bufMgrIn);
 
-               // insert entries for every tuple in the base relation
-               FileScan fscan(relationName, bufMgrIn);
-
-               try
-               {
-                   RecordId scanRid;
-                   while (1)
-                   {
-                       fscan.scanNext(scanRid);
-                       std::string recordStr = fscan.getRecord();
-                       const char *record = recordStr.c_str();
-                       int key = *((int *)(record + attrByteOffset));
-                       this->insertEntry(&key, scanRid);
-                   }
-               }
-               catch (EndOfFileException e)
-               {
-                   std::cout << "Read all records" << std::endl;
-               }
-       }
+        try
+        {
+            RecordId scanRid;
+            while (1)
+            {
+                fscan.scanNext(scanRid);
+                std::string recordStr = fscan.getRecord();
+                const char *record = recordStr.c_str();
+                int key = *((int *)(record + attrByteOffset));
+                this->insertEntry(&key, scanRid);
+            }
+        }
+        catch (EndOfFileException e)
+        {
+            bufMgr->flushFile(file);
+        }
+    }
 
     outIndexName = indexName;
-
 }
 
 // -----------------------------------------------------------------------------
@@ -198,7 +195,6 @@ const void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 
             // print
             NonLeafNodeInt *node = (NonLeafNodeInt *)rootPage;
-        
         }
         else
         {
@@ -297,7 +293,6 @@ const void BTreeIndex::startScan(const void *lowValParm,
     //unpin root page
     bufMgr->unPinPage(file, rootPageNum, false);
     scanExecuting = true; // not error thrown within helper, start
-  
 }
 
 // -----------------------------------------------------------------------------
@@ -307,7 +302,7 @@ const void BTreeIndex::startScan(const void *lowValParm,
 
 const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &index)
 {
-    
+
     NonLeafNodeInt *np = (NonLeafNodeInt *)nl;
     int level = np->level;
 
@@ -335,7 +330,7 @@ const void BTreeIndex::startScanHeler(Page *nl, const void *lowValParm, int &ind
         bool found = false;
         while (!found)
         {
-            
+
             // iterate through the key on the leaf
             for (int i = 0; i < INTARRAYNONLEAFSIZE; i++)
             {
@@ -428,7 +423,6 @@ const void BTreeIndex::scanNext(RecordId &outRid)
             // Reset nextEntry
             nextEntry = 0;
         }
-
     }
     // find whether the rid satisfy op
     int key = leaf->keyArray[nextEntry];
@@ -463,7 +457,6 @@ const void BTreeIndex::scanNext(RecordId &outRid)
     {
         throw IndexScanCompletedException();
     }
-   
 }
 
 // -----------------------------------------------------------------------------
@@ -487,7 +480,6 @@ const void BTreeIndex::endScan()
         currentPageNum = static_cast<PageId>(-1);
         nextEntry = -1;
     }
-
 }
 
 // -----------------------------------------------------------------------------
@@ -937,4 +929,3 @@ const void BTreeIndex::findMiddle(Page *page, bool isLeaf, const void *keyPtr, i
 }
 
 } // namespace badgerdb
-
