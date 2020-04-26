@@ -82,6 +82,11 @@ void createMaxRelationRandom();
 void intTests();
 int intScan(BTreeIndex *index, int lowVal, Operator lowOp, int highVal, Operator highOp);
 void indexTests();
+void emptyTests();
+int emptyScan(BTreeIndex *index, int lowVal, Operator lowOp, int highVal, Operator highOp);
+void emptyindexTests();
+void createEmpty();
+
 
 void test1();
 void test2();
@@ -92,6 +97,7 @@ void test6();
 void test7();
 void test8();
 void test9();
+void test10();
 void errorTests();
 void deleteRelation();
 
@@ -165,6 +171,7 @@ int main(int argc, char **argv)
     test7();
     test8();
     test9();
+    test10();
 	errorTests();
 	std::cout << "Pass all tests!" << std::endl;
 
@@ -259,6 +266,16 @@ void test9()
     std::cout << "createMaxRelationRandom" << std::endl;
     createMaxRelationRandom();
     indexTests();
+    deleteRelation();
+}
+
+void test10()
+{
+    // Create a relation with tuples valued 0 to a max relation size in random order and perform index tests on attributes of all three types (int, double, string)
+    std::cout << "---------------------" << std::endl;
+    std::cout << "EmptyTree" << std::endl;
+    createEmpty();
+    emptyTests();
     deleteRelation();
 }
 
@@ -983,4 +1000,64 @@ void deleteRelation()
 	catch(FileNotFoundException e)
 	{
 	}
+}
+
+void createEmpty()
+{
+    std::vector<RecordId> ridVec;
+     // destroy any old copies of relation file
+       try
+       {
+           File::remove(relationName);
+       }
+       catch(FileNotFoundException e)
+       {
+       }
+
+     file1 = new PageFile(relationName, true);
+
+     // initialize all of record1.s to keep purify happy
+     memset(record1.s, ' ', sizeof(record1.s));
+       PageId new_page_number;
+     Page new_page = file1->allocatePage(new_page_number);
+
+       file1->writePage(new_page_number, new_page);
+}
+
+void emptyTests()
+{
+    std::cout << "Create an empty B+ tree" << std::endl;
+    BTreeIndex index(relationName, intIndexName, bufMgr, offsetof(tuple,i), INTEGER);
+    
+    emptyScan(&index,25,GT,40,LT);
+    emptyScan(&index,20,GTE,35,LTE);
+    emptyScan(&index,-3,GT,3,LT);
+
+}
+
+
+int emptyScan(BTreeIndex * index, int lowVal, Operator lowOp, int highVal, Operator highOp)
+{
+  RecordId scanRid;
+    Page *curPage;
+
+  std::cout << "Scan for ";
+  if( lowOp == GT ) { std::cout << "("; } else { std::cout << "["; }
+  std::cout << lowVal << "," << highVal;
+  if( highOp == LT ) { std::cout << ")"; } else { std::cout << "]"; }
+  std::cout << std::endl;
+
+  int numResults = 0;
+    
+    try
+    {
+      index->startScan(&lowVal, lowOp, &highVal, highOp);
+      std::cout << "Should throw NoSuchKeyFoundException when the tree is empty." << std::endl;
+       return 0;
+    }
+    catch(NoSuchKeyFoundException e)
+    {
+        std::cout << "NoSuchKeyFoundException test passed." << std::endl;
+        
+    }
 }
