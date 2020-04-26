@@ -55,8 +55,8 @@ BTreeIndex::BTreeIndex(const std::string &relationName,
         // std::string str(inf->relationName);
         // std::cout << (inf->relationName) << std::endl;
 
-        if (strcmp(inf->relationName, relationName.c_str()) != 0 || 
-            (inf->attrByteOffset != attrByteOffset) || 
+        if (strcmp(inf->relationName, relationName.c_str()) != 0 ||
+            (inf->attrByteOffset != attrByteOffset) ||
             (inf->attrType != attrType))
         {
             throw BadIndexInfoException(indexName);
